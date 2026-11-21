@@ -1,0 +1,52 @@
+:root {
+  --bg: #f4f6f8; --card: #fff; --txt: #1d2530; --mut: #5f6b7a; --borda: #d9dfe6;
+  --pri: #0b5cad; --pri-esc: #08467f; --ok: #12813a; --ok-bg: #e5f6eb; --nao: #c0262d; --nao-bg: #fdecec;
+  --av: #a15c00; --av-bg: #fff4e0; --raio: 10px;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--txt); font-size: 16px; }
+a { color: var(--pri); }
+header.topo { background: var(--pri); color: #fff; display: flex; align-items: center; gap: 16px; padding: 10px 16px; flex-wrap: wrap; }
+header.topo .marca { font-weight: 700; font-size: 18px; margin-right: auto; }
+header.topo nav { display: flex; gap: 4px; flex-wrap: wrap; }
+header.topo nav a { color: #fff; text-decoration: none; padding: 6px 10px; border-radius: 6px; }
+header.topo nav a.ativo, header.topo nav a:hover { background: rgba(255,255,255,.18); }
+header.topo button { background: transparent; border: 1px solid rgba(255,255,255,.5); color: #fff; }
+main { max-width: 1200px; margin: 0 auto; padding: 16px; }
+.card { background: var(--card); border: 1px solid var(--borda); border-radius: var(--raio); padding: 16px; margin-bottom: 16px; }
+h1 { font-size: 22px; margin: 4px 0 16px; } h2 { font-size: 18px; margin: 0 0 12px; }
+button, .btn { font: inherit; padding: 8px 14px; border-radius: 8px; border: 1px solid var(--borda); background: #fff; cursor: pointer; color: var(--txt); text-decoration: none; display: inline-block; }
+button.pri, .btn.pri { background: var(--pri); color: #fff; border-color: var(--pri); }
+button.pri:hover { background: var(--pri-esc); }
+button.perigo { color: var(--nao); border-color: var(--nao); }
+button:disabled { opacity: .5; cursor: default; }
+input, select, textarea { font: inherit; padding: 8px 10px; border: 1px solid var(--borda); border-radius: 8px; width: 100%; background: #fff; color: var(--txt); }
+label { display: block; font-size: 13px; color: var(--mut); margin-bottom: 4px; }
+.grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+.linha { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.linha > .cresce { flex: 1; min-width: 180px; }
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+th, td { text-align: left; padding: 8px; border-bottom: 1px solid var(--borda); vertical-align: middle; }
+th { color: var(--mut); font-weight: 600; background: #fafbfc; }
+tr.clicavel { cursor: pointer; } tr.clicavel:hover { background: #f0f5fb; }
+.tabela-rolagem { overflow-x: auto; }
+.tag { display: inline-block; padding: 2px 8px; border-radius: 99px; font-size: 12px; font-weight: 600; }
+.tag.ativo, .tag.liberado { background: var(--ok-bg); color: var(--ok); }
+.tag.inadimplente, .tag.suspenso, .tag.negado { background: var(--nao-bg); color: var(--nao); }
+.tag.inativo { background: #eceff2; color: var(--mut); }
+.tag.aviso { background: var(--av-bg); color: var(--av); }
+.mut { color: var(--mut); font-size: 14px; }
+.foto-mini { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; background: #dde3ea; vertical-align: middle; }
+.kpis { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 12px; margin-bottom: 16px; }
+.kpi { background: var(--card); border: 1px solid var(--borda); border-radius: var(--raio); padding: 14px; }
+.kpi b { display: block; font-size: 28px; } .kpi span { color: var(--mut); font-size: 13px; }
+dialog { border: none; border-radius: var(--raio); padding: 0; width: min(860px, 96vw); max-height: 94vh; }
+dialog::backdrop { background: rgba(0,0,0,.45); }
+dialog .cab { display: flex; justify-content: space-between; align-items: center; padding: 14px 16px; border-bottom: 1px solid var(--borda); position: sticky; top: 0; background: #fff; z-index: 1; }
+dialog .corpo { padding: 16px; }
+dialog .rodape { padding: 12px 16px; border-top: 1px solid var(--borda); display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; position: sticky; bottom: 0; background: #fff; }
+.msg { padding: 10px 12px; border-radius: 8px; margin: 8px 0; }
+.msg.erro { background: var(--nao-bg); color: var(--nao); } .msg.ok { background: var(--ok-bg); color: var(--ok); }
+.oculto { display: none !important; }
+@media (max-width: 640px) { main { padding: 10px; } header.topo .marca { width: 100%; } }

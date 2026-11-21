@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Carteirinhas · Impressão</title>
+<link rel="stylesheet" href="/app.css">
+<style>
+  @page { size: A4; margin: 10mm; }
+  body { background: #fff; }
+  .instr { padding: 12px 16px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+  .folha { display: grid; grid-template-columns: repeat(2, 85.6mm); gap: 4mm; padding: 0 16px 16px; }
+  .cart { width: 85.6mm; height: 54mm; border: 0.3mm dashed #999; border-radius: 3mm; padding: 3mm; display: grid;
+    grid-template-columns: 22mm 1fr 26mm; gap: 2.5mm; align-items: center; break-inside: avoid; overflow: hidden; font-size: 8.5pt; }
+  .cart .topo { grid-column: 1 / -1; background: var(--pri); color: #fff; margin: -3mm -3mm 0; padding: 1.5mm 3mm; font-weight: 700; font-size: 9pt;
+    -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .cart img.foto, .cart .sf { width: 22mm; height: 28mm; object-fit: cover; border-radius: 1.5mm; background: #e3e8ee; }
+  .cart img.qr { width: 26mm; height: 26mm; }
+  .cart .nome { font-weight: 700; font-size: 9pt; line-height: 1.15; }
+  .cart .mat { font-size: 11pt; font-weight: 700; margin-top: 1.5mm; letter-spacing: .3mm; }
+  @media print { .instr, header { display: none; } .folha { padding: 0; } }
+</style>
+</head>
+<body>
+<div class="instr">
+  <button class="pri" onclick="print()">Imprimir</button>
+  <span class="mut">Tamanho padrão de cartão (85,6 × 54 mm). Imprima em papel 180 g ou adesivo e plastifique; ou use impressora de cartão PVC.</span>
+</div>
+<div class="folha" id="folha"></div>
+<script src="/app.js"></script>
+<script>
+App.iniciar({ admin: true, menu: false }).then(async (u) => {
+  const ids = (new URLSearchParams(location.search).get('ids') || '').split(',').filter(Boolean);
+  const socios = await Promise.all(ids.map((id) => App.api('/api/socios/' + id)));
+  folha.innerHTML = socios.map((s) => `<div class="cart">
+    <div class="topo">${App.esc(u.clube)} · Carteirinha de sócio</div>
+    ${s.foto ? `<img class="foto" src="/fotos/${App.esc(s.foto)}" alt="">` : '<div class="sf"></div>'}
+    <div><div class="nome">${App.esc(s.nome)}</div>
+      <div class="mut" style="font-size:7.5pt">${s.tipo === 'dependente' ? 'DEPENDENTE' : 'TITULAR'}</div>
+      <div class="mat">${App.esc(s.matricula)}</div></div>
+    <img class="qr" src="/api/socios/${s.id}/qr" alt="">
+  </div>`).join('');
+});
+</script>
+</body>
+</html>

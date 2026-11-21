@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Configurações · Controle de Acesso</title>
+<link rel="stylesheet" href="/app.css">
+</head>
+<body>
+<main>
+  <h1>Configurações</h1>
+  <div class="card">
+    <h2>Geral</h2>
+    <form id="fCfg" class="grade">
+      <div><label>Nome do clube</label><input name="nome_clube"></div>
+      <div><label>Alerta de reentrada (min) — 0 desliga</label><input name="antipassback_min" type="number" min="0"></div>
+      <div><label>Avisar exame vencendo (dias)</label><input name="aviso_exame_dias" type="number" min="0"></div>
+      <div><label>Tempo do resultado na tela (s)</label><input name="tempo_resultado_seg" type="number" min="1"></div>
+      <div style="align-self:end"><button class="pri">Salvar</button> <span id="okCfg" class="mut"></span></div>
+    </form>
+  </div>
+  <div class="card">
+    <h2>Pontos de acesso</h2>
+    <p class="mut">“URL de acionamento” é chamada quando o acesso é liberado — use para abrir catraca/fechadura via módulo ESP32 + relé (ver docs/esp32-acionamento). Deixe vazio se a liberação for visual (recepcionista/salva-vidas).</p>
+    <div class="tabela-rolagem"><table><thead><tr><th>Código</th><th>Nome</th><th>Exige exame</th><th>URL de acionamento</th><th>Ativo</th><th></th></tr></thead><tbody id="tbPontos"></tbody></table></div>
+    <form id="fPonto" class="linha" style="margin-top:12px">
+      <input name="codigo" placeholder="código (ex.: piscina-infantil)" style="width:220px" required>
+      <input name="nome" placeholder="nome" style="width:220px" required>
+      <label class="linha" style="margin:0"><input type="checkbox" name="exige_exame" style="width:auto"> exige exame</label>
+      <button>Adicionar ponto</button>
+    </form>
+  </div>
+  <div class="card">
+    <h2>Usuários do sistema</h2>
+    <div class="tabela-rolagem"><table><thead><tr><th>Nome</th><th>Login</th><th>Perfil</th><th>Ativo</th><th></th></tr></thead><tbody id="tbUsu"></tbody></table></div>
+    <form id="fUsu" class="linha" style="margin-top:12px">
+      <input name="nome" placeholder="nome" style="width:200px" required>
+      <input name="login" placeholder="login" style="width:150px" required>
+      <input name="senha" type="password" placeholder="senha (mín. 6)" style="width:160px" required>
+      <select name="perfil" style="width:auto"><option value="recepcao">Recepção</option><option value="admin">Administrador</option></select>
+      <button>Adicionar usuário</button>
+    </form>
+  </div>
+  <div class="card">
+    <h2>Minha senha</h2>
+    <form id="fSenha" class="linha">
+      <input name="atual" type="password" placeholder="senha atual" style="width:200px" required>
+      <input name="nova" type="password" placeholder="nova senha (mín. 6)" style="width:200px" required>
+      <button>Alterar</button> <span id="okSenha" class="mut"></span>
+    </form>
+  </div>
+  <div class="card">
+    <h2>Backup</h2>
+    <p class="mut">Baixe uma cópia do banco de dados pelo menos uma vez por semana e guarde em pendrive ou Google Drive. As fotos ficam na pasta <code>data/fotos</code> do servidor (copie junto).</p>
+    <a class="btn pri" href="/api/backup">Baixar backup do banco</a>
+  </div>
+</main>
+<script src="/app.js"></script>
+<script>
+const val = (form) => Object.fromEntries(new FormData(form));
+async function carregar() {
+  const c = await App.api('/api/config');
+  for (const el of fCfg.elements) if (el.name) el.value = c[el.name] ?? '';
+  const pontos = await App.api('/api/pontos');
+  tbPontos.innerHTML = pontos.map((p) => `<tr data-id="${p.id}"><td>${App.esc(p.codigo)}</td><td><input data-c="nome" value="${App.esc(p.nome)}"></td>
+    <td><input type="checkbox" data-c="exige_exame" ${p.exige_exame ? 'checked' : ''} style="width:auto"></td>
+    <td><input data-c="acionamento_url" value="${App.esc(p.acionamento_url || '')}" placeholder="http://192.168.0.50/abrir?chave=..."></td>
+    <td><input type="checkbox" data-c="ativo" ${p.ativo ? 'checked' : ''} style="width:auto"></td>
+    <td class="linha" style="flex-wrap:nowrap"><button data-acao="salvar">Salvar</button><button data-acao="testar">Testar</button>
+      <a class="btn" href="/acesso?ponto=${encodeURIComponent(p.codigo)}">Abrir</a></td></tr>`).join('');
+  const us = await App.api('/api/usuarios');
+  tbUsu.innerHTML = us.map((u) => `<tr data-id="${u.id}"><td>${App.esc(u.nome)}</td><td>${App.esc(u.login)}</td>
+    <td><select data-c="perfil" style="width:auto"><option value="recepcao" ${u.perfil === 'recepcao' ? 'selected' : ''}>Recepção</option><option value="admin" ${u.perfil === 'admin' ? 'selected' : ''}>Administrador</option></select></td>
+    <td><input type="checkbox" data-c="ativo" ${u.ativo ? 'checked' : ''} style="width:auto"></td>
+    <td class="linha" style="flex-wrap:nowrap"><button data-acao="salvar">Salvar</button><button data-acao="senha">Redefinir senha</button></td></tr>`).join('');
+}
+fCfg.onsubmit = async (e) => { e.preventDefault(); try { await App.api('/api/config', { method: 'PUT', body: val(fCfg) }); okCfg.textContent = 'Salvo.'; } catch (err) { alert(err.message); } };
+tbPontos.onclick = async (e) => {
+  const b = e.target.closest('button'); if (!b) return; const tr = b.closest('tr'); const id = tr.dataset.id;
+  try {
+    if (b.dataset.acao === 'salvar') {
+      const d = {}; tr.querySelectorAll('[data-c]').forEach((i) => { d[i.dataset.c] = i.type === 'checkbox' ? i.checked : i.value; });
+      await App.api('/api/pontos/' + id, { method: 'PUT', body: d }); alert('Ponto salvo.');
+    } else { const r = await App.api(`/api/pontos/${id}/testar`, { method: 'POST' }); alert(r.ok ? 'Dispositivo respondeu OK — catraca/fechadura deve ter acionado.' : 'Dispositivo respondeu com erro HTTP ' + r.status); }
+  } catch (err) { alert(err.message); }
+};
+fPonto.onsubmit = async (e) => { e.preventDefault(); const d = val(fPonto); d.exige_exame = !!d.exige_exame; try { await App.api('/api/pontos', { method: 'POST', body: d }); fPonto.reset(); carregar(); } catch (err) { alert(err.message); } };
+tbUsu.onclick = async (e) => {
+  const b = e.target.closest('button'); if (!b) return; const tr = b.closest('tr'); const id = tr.dataset.id;
+  try {
+    if (b.dataset.acao === 'salvar') {
+      await App.api('/api/usuarios/' + id, { method: 'PUT', body: { perfil: tr.querySelector('[data-c=perfil]').value, ativo: tr.querySelector('[data-c=ativo]').checked } }); alert('Usuário salvo.');
+    } else {
+      const s = prompt('Nova senha (mín. 6 caracteres):'); if (!s) return;
+      await App.api('/api/usuarios/' + id, { method: 'PUT', body: { senha: s } }); alert('Senha redefinida.');
+    }
+  } catch (err) { alert(err.message); carregar(); }
+};
+fUsu.onsubmit = async (e) => { e.preventDefault(); try { await App.api('/api/usuarios', { method: 'POST', body: val(fUsu) }); fUsu.reset(); carregar(); } catch (err) { alert(err.message); } };
+fSenha.onsubmit = async (e) => { e.preventDefault(); try { await App.api('/api/me/senha', { method: 'PUT', body: val(fSenha) }); fSenha.reset(); okSenha.textContent = 'Senha alterada.'; } catch (err) { alert(err.message); } };
+App.iniciar({ admin: true }).then(carregar);
+</script>
+</body>
+</html>

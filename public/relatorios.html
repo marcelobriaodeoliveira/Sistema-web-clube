@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Relatórios · Controle de Acesso</title>
+<link rel="stylesheet" href="/app.css">
+</head>
+<body>
+<main>
+  <h1>Relatórios</h1>
+  <div class="card">
+    <h2>Histórico de acessos</h2>
+    <div class="linha">
+      <div><label>De</label><input type="date" id="de"></div>
+      <div><label>Até</label><input type="date" id="ate"></div>
+      <div><label>Ponto</label><select id="ponto"><option value="">Todos</option></select></div>
+      <div><label>Resultado</label><select id="resultado"><option value="">Todos</option><option>liberado</option><option>negado</option></select></div>
+      <div style="align-self:flex-end" class="linha"><button class="pri" id="btFiltrar">Filtrar</button><button id="btCSV">Exportar CSV</button></div>
+    </div>
+    <p id="resumo" class="mut"></p>
+    <div class="tabela-rolagem" style="max-height:60vh;overflow:auto"><table><thead><tr><th>Data/hora</th><th>Ponto</th><th>Matrícula</th><th>Nome</th><th>Resultado</th><th>Motivo</th><th>Método</th><th>Operador</th></tr></thead><tbody id="tb"></tbody></table></div>
+  </div>
+  <div class="card">
+    <h2>Pendências cadastrais</h2>
+    <div class="grade" style="grid-template-columns:1fr 1fr" id="pend"></div>
+  </div>
+</main>
+<script src="/app.js"></script>
+<script>
+function filtros() { return new URLSearchParams({ de: de.value, ate: ate.value, ponto: ponto.value, resultado: resultado.value }); }
+async function carregar() {
+  const r = await App.api('/api/acessos?' + filtros());
+  const lib = r.filter((a) => a.resultado === 'liberado').length;
+  resumo.textContent = `${r.length} registro(s): ${lib} liberado(s), ${r.length - lib} negado(s).`;
+  tb.innerHTML = r.slice(0, 2000).map((a) => `<tr><td>${App.br(a.data_hora)} ${App.hora(a.data_hora)}</td><td>${App.esc(a.ponto)}</td><td>${App.esc(a.matricula || '')}</td>
+    <td>${App.esc(a.nome || (a.codigo_lido ? 'código: ' + a.codigo_lido : ''))}</td><td><span class="tag ${a.resultado}">${a.resultado}</span></td>
+    <td class="mut">${App.esc(a.motivo || '')}</td><td>${a.metodo}</td><td class="mut">${App.esc(a.operador || '')}</td></tr>`).join('')
+    || '<tr><td colspan="8" class="mut">Nenhum registro no período.</td></tr>';
+}
+async function pendencias() {
+  const p = await App.api('/api/relatorio/pendencias');
+  const bloco = (t, l, campo) => `<div><h2 style="font-size:16px">${t} (${l.length})</h2><div style="max-height:300px;overflow:auto"><table><tbody>${l.map((s) => `<tr><td>${App.esc(s.matricula)}</td><td>${App.esc(s.nome)}</td><td>${s[campo] ? App.br(s[campo]) : 'sem registro'}</td></tr>`).join('') || '<tr><td class="mut">Nenhum</td></tr>'}</tbody></table></div></div>`;
+  pend.innerHTML = bloco('Exame médico vencido/ausente', p.exame_vencido, 'exame_validade') + bloco('Mensalidade vencida (titulares)', p.mensalidade_vencida, 'validade');
+}
+btFiltrar.onclick = carregar;
+btCSV.onclick = () => { location.href = '/api/acessos.csv?' + filtros(); };
+App.iniciar({ admin: true }).then(async () => {
+  de.value = ate.value = App.hoje();
+  (await App.api('/api/pontos')).forEach((p) => ponto.insertAdjacentHTML('beforeend', `<option value="${App.esc(p.codigo)}">${App.esc(p.nome)}</option>`));
+  carregar(); pendencias();
+});
+</script>
+</body>
+</html>

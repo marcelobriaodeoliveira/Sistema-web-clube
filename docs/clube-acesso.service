@@ -1,0 +1,15 @@
+# Linux (systemd): copie para /etc/systemd/system/ e rode:
+#   sudo systemctl enable --now clube-acesso
+[Unit]
+Description=Sistema de Controle de Acesso do Clube
+After=network.target
+
+[Service]
+WorkingDirectory=/opt/sistema-web-clube
+ExecStart=/usr/bin/node --no-warnings src/server.js
+Restart=always
+Environment=PORTA=3000
+User=clube
+
+[Install]
+WantedBy=multi-user.target

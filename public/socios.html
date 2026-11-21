@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sócios · Controle de Acesso</title>
+<link rel="stylesheet" href="/app.css">
+<style>
+  .foto-edit { display: flex; gap: 16px; align-items: flex-start; flex-wrap: wrap; margin-bottom: 12px; }
+  .foto-edit img, .foto-edit video, .foto-edit .vazio { width: 150px; height: 150px; object-fit: cover; border-radius: 10px; background: #dde3ea; }
+  .qr img { width: 150px; height: 150px; }
+  .so-admin { } body.recepcao .so-admin { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+  <div class="linha" style="justify-content:space-between;margin-bottom:12px">
+    <h1 style="margin:0">Sócios</h1>
+    <div class="linha so-admin">
+      <button class="pri" id="btNovo">+ Novo sócio</button>
+      <button id="btImportar">Importar planilha (CSV)</button>
+      <a class="btn" href="/api/socios-exportar.csv">Exportar CSV</a>
+      <button id="btImprimir" disabled>Imprimir carteirinhas (0)</button>
+    </div>
+  </div>
+  <div class="card linha">
+    <input class="cresce" id="q" placeholder="Buscar por nome, matrícula ou CPF">
+    <select id="fSituacao" style="width:auto"><option value="">Todas as situações</option><option>ativo</option><option>inadimplente</option><option>suspenso</option><option>inativo</option></select>
+    <select id="fTipo" style="width:auto"><option value="">Titulares e dependentes</option><option value="titular">Titulares</option><option value="dependente">Dependentes</option></select>
+  </div>
+  <div class="card tabela-rolagem">
+    <table><thead><tr><th class="so-admin"><input type="checkbox" id="selTodos" style="width:auto"></th><th></th><th>Matrícula</th><th>Nome</th><th>Tipo</th><th>Situação</th><th>Mensalidade até</th><th>Exame médico até</th></tr></thead>
+    <tbody id="tb"></tbody></table>
+    <p class="mut" id="contagem"></p>
+  </div>
+</main>
+
+<dialog id="dlg">
+  <form id="fSocio" method="dialog">
+    <div class="cab"><h2 id="dlgTitulo" style="margin:0">Sócio</h2><button type="button" data-fechar>✕</button></div>
+    <div class="corpo">
+      <div class="foto-edit" id="areaFoto">
+        <div><img id="imgFoto" class="oculto" alt=""><div id="semFoto" class="vazio"></div><video id="video" class="oculto" autoplay playsinline></video></div>
+        <div class="linha" style="flex-direction:column;align-items:stretch">
+          <button type="button" id="btWebcam">📷 Tirar foto (webcam)</button>
+          <button type="button" id="btCapturar" class="pri oculto">Capturar</button>
+          <label class="btn" style="margin:0;text-align:center;color:var(--txt)">📁 Enviar arquivo<input type="file" id="arqFoto" accept="image/*" capture="user" hidden></label>
+          <span class="mut" id="dicaFoto">Salve o cadastro antes de incluir a foto.</span>
+        </div>
+        <div class="qr oculto" id="areaQR" style="margin-left:auto;text-align:center">
+          <img id="imgQR" alt="QR Code"><br>
+          <a class="btn" id="lnkQR" href="#">Baixar QR (WhatsApp)</a><br>
+          <button type="button" id="btReemitir" class="perigo" style="margin-top:6px">Reemitir (perda/roubo)</button>
+        </div>
+      </div>
+      <div class="grade">
+        <div><label>Matrícula</label><input name="matricula" placeholder="automática se vazio"></div>
+        <div style="grid-column: span 2"><label>Nome completo *</label><input name="nome" required></div>
+        <div><label>CPF</label><input name="cpf" inputmode="numeric"></div>
+        <div><label>Data de nascimento</label><input name="data_nasc" type="date"></div>
+        <div><label>Tipo</label><select name="tipo"><option value="titular">Titular</option><option value="dependente">Dependente</option></select></div>
+        <div class="dep"><label>Titular *</label><input id="buscaTitular" list="listaTitulares" placeholder="digite o nome do titular"><datalist id="listaTitulares"></datalist><input type="hidden" name="titular_id"></div>
+        <div class="dep"><label>Parentesco</label><select name="parentesco"><option></option><option>Cônjuge</option><option>Filho(a)</option><option>Pai/Mãe</option><option>Outro</option></select></div>
+        <div><label>Telefone</label><input name="telefone" inputmode="tel"></div>
+        <div><label>E-mail</label><input name="email" type="email"></div>
+        <div><label>Situação</label><select name="situacao"><option>ativo</option><option>inadimplente</option><option>suspenso</option><option>inativo</option></select></div>
+        <div class="tit"><label>Mensalidade paga até</label><input name="validade" type="date"></div>
+        <div><label>Exame médico (piscina) válido até</label><input name="exame_validade" type="date"></div>
+        <div style="grid-column: 1 / -1"><label>Observações</label><textarea name="observacoes" rows="2"></textarea></div>
+      </div>
+      <div id="extras"></div>
+      <div id="msgSocio" class="msg erro oculto"></div>
+    </div>
+    <div class="rodape">
+      <button type="button" class="perigo oculto" id="btExcluir" style="margin-right:auto">Excluir</button>
+      <button type="button" data-fechar>Cancelar</button>
+      <button type="button" class="oculto" id="btNovoDep">+ Dependente</button>
+      <button class="pri" id="btSalvar">Salvar</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="dlgImp">
+  <div class="cab"><h2 style="margin:0">Importar planilha de sócios</h2><button type="button" data-fechar>✕</button></div>
+  <div class="corpo">
+    <p>Salve a planilha atual do clube como <b>CSV (separado por ponto e vírgula)</b> com o cabeçalho abaixo. Colunas extras são ignoradas; matrícula existente é <b>atualizada</b>.</p>
+    <pre style="background:#f4f6f8;padding:10px;border-radius:8px;overflow:auto;font-size:13px">matricula;nome;cpf;data_nasc;tipo;matricula_titular;parentesco;telefone;email;situacao;validade;exame_validade
+00001;JOÃO DA SILVA;12345678909;10/05/1980;titular;;;(11) 99999-0000;;ativo;31/12/2026;30/06/2026
+00002;MARIA DA SILVA;;02/03/2012;dependente;00001;Filho(a);;;ativo;;30/06/2026</pre>
+    <a class="btn" href="/modelo-importacao.csv" download>Baixar modelo</a>
+    <p><input type="file" id="arqCSV" accept=".csv,text/csv"></p>
+    <div id="resImp"></div>
+  </div>
+</dialog>
+
+<script src="/app.js"></script>
+<script>
+const sel = new Set();
+let atual = null; // sócio em edição
+const f = document.getElementById('fSocio');
+
+async function listar() {
+  const p = new URLSearchParams({ q: q.value, situacao: fSituacao.value, tipo: fTipo.value, limite: 2000 });
+  const r = await App.api('/api/socios?' + p);
+  tb.innerHTML = r.map((s) => `<tr class="clicavel" data-id="${s.id}">
+    <td class="so-admin"><input type="checkbox" data-sel="${s.id}" ${sel.has(s.id) ? 'checked' : ''} style="width:auto"></td>
+    <td>${App.fotoHTML(s.foto)}</td><td>${App.esc(s.matricula)}</td><td><b>${App.esc(s.nome)}</b>${s.titular_nome ? `<br><span class="mut">dep. de ${App.esc(s.titular_nome)}</span>` : ''}</td>
+    <td>${s.tipo}</td><td><span class="tag ${s.situacao}">${s.situacao}</span>${s.situacao_titular && s.situacao_titular !== 'ativo' ? ` <span class="tag aviso">titular ${s.situacao_titular}</span>` : ''}</td>
+    <td>${venc(s.validade)}</td><td>${venc(s.exame_validade)}</td></tr>`).join('') || '<tr><td colspan="8" class="mut">Nenhum sócio encontrado.</td></tr>';
+  contagem.textContent = `${r.length} registro(s)` + (r.length === 2000 ? ' (refine a busca)' : '');
+}
+function venc(d) { if (!d) return '<span class="mut">—</span>'; return d < App.hoje() ? `<span class="tag negado">${App.br(d)}</span>` : App.br(d); }
+let tq; q.oninput = () => { clearTimeout(tq); tq = setTimeout(listar, 250); };
+fSituacao.onchange = fTipo.onchange = listar;
+
+tb.onclick = (e) => {
+  const cb = e.target.closest('[data-sel]');
+  if (cb) { const id = +cb.dataset.sel; cb.checked ? sel.add(id) : sel.delete(id); atualizarSel(); return; }
+  const tr = e.target.closest('tr[data-id]');
+  if (tr && App.usuario.perfil === 'admin') abrir(+tr.dataset.id);
+};
+selTodos.onchange = () => { document.querySelectorAll('[data-sel]').forEach((cb) => { cb.checked = selTodos.checked; selTodos.checked ? sel.add(+cb.dataset.sel) : sel.delete(+cb.dataset.sel); }); atualizarSel(); };
+function atualizarSel() { btImprimir.disabled = !sel.size; btImprimir.textContent = `Imprimir carteirinhas (${sel.size})`; }
+btImprimir.onclick = () => window.open('/carteirinhas?ids=' + [...sel].join(','), '_blank');
+
+// ----- Formulário -----
+function ajustaTipo() {
+  const dep = f.tipo.value === 'dependente';
+  f.querySelectorAll('.dep').forEach((el) => el.classList.toggle('oculto', !dep));
+  f.querySelectorAll('.tit').forEach((el) => el.classList.toggle('oculto', dep));
+}
+f.tipo.onchange = ajustaTipo;
+let titulares = [];
+buscaTitular.oninput = async () => {
+  const v = buscaTitular.value.trim();
+  const achado = titulares.find((t) => `${t.nome} (${t.matricula})` === v);
+  f.titular_id.value = achado ? achado.id : '';
+  if (achado || v.length < 3) return;
+  titulares = await App.api('/api/socios?tipo=titular&limite=20&q=' + encodeURIComponent(v));
+  listaTitulares.innerHTML = titulares.map((t) => `<option value="${App.esc(t.nome)} (${App.esc(t.matricula)})">`).join('');
+};
+
+async function abrir(id, preset = {}) {
+  msgSocio.classList.add('oculto'); f.reset(); extras.innerHTML = ''; pararWebcam();
+  atual = id ? await App.api('/api/socios/' + id) : null;
+  const s = atual || preset;
+  for (const el of f.elements) if (el.name && s[el.name] !== undefined && s[el.name] !== null) el.value = s[el.name];
+  buscaTitular.value = '';
+  if (atual?.titular) { titulares = [atual.titular]; buscaTitular.value = `${atual.titular.nome} (${atual.titular.matricula})`; }
+  dlgTitulo.textContent = atual ? `${atual.nome} · ${atual.matricula}` : 'Novo sócio';
+  btExcluir.classList.toggle('oculto', !atual);
+  btNovoDep.classList.toggle('oculto', !atual || atual.tipo !== 'titular');
+  areaQR.classList.toggle('oculto', !atual);
+  dicaFoto.classList.toggle('oculto', !!atual);
+  btWebcam.disabled = !atual; arqFoto.disabled = !atual;
+  mostrarFoto(atual?.foto ? '/fotos/' + atual.foto : null);
+  if (atual) {
+    imgQR.src = `/api/socios/${atual.id}/qr?t=${Date.now()}`;
+    lnkQR.href = `/api/socios/${atual.id}/qr?formato=png&download=1`;
+    let h = '';
+    if (atual.dependentes.length) h += `<h2 style="margin-top:16px">Dependentes</h2><table><tbody>${atual.dependentes.map((d) => `<tr class="clicavel" data-dep="${d.id}"><td>${App.esc(d.matricula)}</td><td>${App.esc(d.nome)}</td><td>${App.esc(d.parentesco || '')}</td><td><span class="tag ${d.situacao}">${d.situacao}</span></td><td>exame: ${d.exame_validade ? App.br(d.exame_validade) : '—'}</td></tr>`).join('')}</tbody></table>`;
+    if (atual.ultimos_acessos.length) h += `<h2 style="margin-top:16px">Últimos acessos</h2><table><tbody>${atual.ultimos_acessos.map((a) => `<tr><td>${App.br(a.data_hora)} ${App.hora(a.data_hora)}</td><td>${App.esc(a.ponto)}</td><td><span class="tag ${a.resultado}">${a.resultado}</span></td><td class="mut">${App.esc(a.motivo || '')}</td></tr>`).join('')}</tbody></table>`;
+    extras.innerHTML = h;
+  }
+  ajustaTipo();
+  if (!dlg.open) dlg.showModal();
+}
+extras.onclick = (e) => { const tr = e.target.closest('[data-dep]'); if (tr) abrir(+tr.dataset.dep); };
+btNovo.onclick = () => abrir(null);
+btNovoDep.onclick = () => {
+  const t = atual; abrir(null, { tipo: 'dependente', titular_id: t.id, exame_validade: '' }).then(() => {
+    titulares = [{ id: t.id, nome: t.nome, matricula: t.matricula }]; buscaTitular.value = `${t.nome} (${t.matricula})`; f.titular_id.value = t.id;
+  });
+};
+f.onsubmit = async (e) => {
+  e.preventDefault();
+  const dados = Object.fromEntries(new FormData(f));
+  try {
+    if (atual) await App.api('/api/socios/' + atual.id, { method: 'PUT', body: dados });
+    else { const r = await App.api('/api/socios', { method: 'POST', body: dados }); await listar(); return abrir(r.id); }
+    dlg.close(); listar();
+  } catch (err) { msgSocio.textContent = err.message; msgSocio.classList.remove('oculto'); }
+};
+btExcluir.onclick = async () => {
+  if (!confirm('Excluir definitivamente este cadastro?')) return;
+  try { await App.api('/api/socios/' + atual.id, { method: 'DELETE' }); dlg.close(); listar(); }
+  catch (err) { msgSocio.textContent = err.message; msgSocio.classList.remove('oculto'); }
+};
+btReemitir.onclick = async () => {
+  if (!confirm('Gerar novo QR Code? A carteirinha atual deixará de funcionar imediatamente.')) return;
+  await App.api(`/api/socios/${atual.id}/reemitir`, { method: 'POST' });
+  imgQR.src = `/api/socios/${atual.id}/qr?t=${Date.now()}`; alert('Novo QR gerado. Imprima/envie a nova carteirinha.');
+};
+document.querySelectorAll('[data-fechar]').forEach((b) => b.onclick = () => { pararWebcam(); b.closest('dialog').close(); });
+
+// ----- Foto -----
+let stream = null;
+function mostrarFoto(url) { imgFoto.classList.toggle('oculto', !url); semFoto.classList.toggle('oculto', !!url); if (url) imgFoto.src = url; }
+function pararWebcam() { if (stream) stream.getTracks().forEach((t) => t.stop()); stream = null; video.classList.add('oculto'); btCapturar.classList.add('oculto'); }
+btWebcam.onclick = async () => {
+  if (!window.isSecureContext) return alert('Webcam só funciona via HTTPS ou no próprio servidor (localhost). Use "Enviar arquivo".');
+  try { stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 640 } }); }
+  catch (e) { return alert('Não foi possível abrir a webcam: ' + e.message); }
+  video.srcObject = stream; video.classList.remove('oculto'); imgFoto.classList.add('oculto'); semFoto.classList.add('oculto'); btCapturar.classList.remove('oculto');
+};
+btCapturar.onclick = () => { enviarFoto(video); pararWebcam(); };
+arqFoto.onchange = () => {
+  const file = arqFoto.files[0]; if (!file) return;
+  const img = new Image(); img.onload = () => { enviarFoto(img); URL.revokeObjectURL(img.src); }; img.src = URL.createObjectURL(file); arqFoto.value = '';
+};
+async function enviarFoto(origem) {
+  // recorte quadrado central, 400x400 JPEG (~30 KB)
+  const w = origem.videoWidth || origem.naturalWidth, h = origem.videoHeight || origem.naturalHeight, l = Math.min(w, h);
+  const c = document.createElement('canvas'); c.width = c.height = 400;
+  c.getContext('2d').drawImage(origem, (w - l) / 2, (h - l) / 2, l, l, 0, 0, 400, 400);
+  try { const r = await App.api(`/api/socios/${atual.id}/foto`, { method: 'POST', body: { imagem: c.toDataURL('image/jpeg', 0.85) } }); mostrarFoto(r.foto); listar(); }
+  catch (e) { alert(e.message); }
+}
+
+// ----- Importação -----
+btImportar.onclick = () => { resImp.innerHTML = ''; dlgImp.showModal(); };
+arqCSV.onchange = async () => {
+  const file = arqCSV.files[0]; if (!file) return;
+  const buf = await file.arrayBuffer();
+  let texto = new TextDecoder('utf-8').decode(buf);
+  if (texto.includes('�')) texto = new TextDecoder('windows-1252').decode(buf); // Excel em português costuma salvar em ANSI
+  try {
+    const r = await App.api('/api/socios/importar', { method: 'POST', body: texto, headers: { 'Content-Type': 'text/csv' } });
+    resImp.innerHTML = `<div class="msg ok">${r.total} linha(s): ${r.inseridos} inserido(s), ${r.atualizados} atualizado(s).</div>`
+      + (r.erros.length ? `<div class="msg erro"><b>${r.erros.length} linha(s) com problema:</b><br>${r.erros.map(App.esc).join('<br>')}</div>` : '');
+    listar();
+  } catch (e) { resImp.innerHTML = `<div class="msg erro">${App.esc(e.message)}</div>`; }
+  arqCSV.value = '';
+};
+
+App.iniciar().then((u) => { document.body.classList.add(u.perfil); listar(); });
+</script>
+</body>
+</html>

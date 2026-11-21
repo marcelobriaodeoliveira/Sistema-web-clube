@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Entrar · Controle de Acesso</title>
+<link rel="stylesheet" href="/app.css">
+<style>
+  body { display: grid; place-items: center; min-height: 100vh; padding: 16px; }
+  .card { width: min(380px, 100%); } .card div { margin-bottom: 12px; } button { width: 100%; padding: 12px; }
+</style>
+</head>
+<body>
+<form class="card" id="f">
+  <h1>Controle de Acesso</h1>
+  <div><label for="login">Usuário</label><input id="login" autocomplete="username" autofocus required></div>
+  <div><label for="senha">Senha</label><input id="senha" type="password" autocomplete="current-password" required></div>
+  <div id="msg" class="msg erro oculto"></div>
+  <button class="pri">Entrar</button>
+</form>
+<script src="/app.js"></script>
+<script>
+document.getElementById('f').onsubmit = async (e) => {
+  e.preventDefault();
+  const msg = document.getElementById('msg');
+  try {
+    const u = await App.api('/api/login', { method: 'POST', body: { login: login.value, senha: senha.value } });
+    const volta = new URLSearchParams(location.search).get('volta');
+    location.href = volta && volta.startsWith('/') && !volta.startsWith('//') ? volta : (u.perfil === 'admin' ? '/' : '/acesso?ponto=portaria');
+  } catch (err) { msg.textContent = err.message; msg.classList.remove('oculto'); }
+};
+</script>
+</body>
+</html>

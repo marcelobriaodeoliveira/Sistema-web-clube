@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Painel · Controle de Acesso</title>
+<link rel="stylesheet" href="/app.css">
+</head>
+<body>
+<main>
+  <h1>Painel de hoje <span class="mut" id="dia"></span></h1>
+  <div class="kpis" id="kpis"></div>
+  <div class="card">
+    <div class="linha" style="justify-content:space-between"><h2>Últimas passagens</h2><span class="mut">atualiza a cada 15 s</span></div>
+    <div class="tabela-rolagem"><table><thead><tr><th>Hora</th><th>Ponto</th><th>Sócio</th><th>Resultado</th><th>Motivo</th></tr></thead><tbody id="ult"></tbody></table></div>
+  </div>
+</main>
+<script src="/app.js"></script>
+<script>
+async function carregar() {
+  const p = await App.api('/api/painel');
+  dia.textContent = App.br(p.dia);
+  kpis.innerHTML = p.porPonto.map((x) => `<div class="kpi"><b>${x.liberados || 0}</b><span>Entradas · ${App.esc(x.nome)}</span>
+      ${x.negados ? `<div class="tag negado" style="margin-top:6px">${x.negados} negada(s)</div>` : ''}</div>`).join('')
+    + `<div class="kpi"><b>${p.totais.ativos || 0}</b><span>Sócios ativos (de ${p.totais.total || 0})</span></div>`
+    + `<div class="kpi"><b>${p.totais.inadimplentes || 0}</b><span>Inadimplentes</span></div>`;
+  ult.innerHTML = p.ultimos.map((a) => `<tr><td>${App.hora(a.data_hora)}</td><td>${App.esc(a.ponto)}</td>
+    <td>${a.nome ? `${App.esc(a.nome)} <span class="mut">${App.esc(a.matricula)}</span>` : '<span class="mut">—</span>'}</td>
+    <td><span class="tag ${a.resultado}">${a.resultado}</span></td><td class="mut">${App.esc(a.motivo || '')}</td></tr>`).join('')
+    || '<tr><td colspan="5" class="mut">Nenhuma passagem registrada hoje.</td></tr>';
+}
+App.iniciar().then(() => { carregar(); setInterval(carregar, 15000); });
+</script>
+</body>
+</html>

@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Acesso · Controle de Acesso</title>
+<link rel="stylesheet" href="/app.css">
+<style>
+  main { max-width: 1100px; }
+  .barra { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
+  .barra h1 { margin: 0 auto 0 0; }
+  #codigo { font-size: 22px; padding: 14px; letter-spacing: 1px; }
+  .painel { display: grid; grid-template-columns: 1fr 340px; gap: 16px; }
+  @media (max-width: 860px) { .painel { grid-template-columns: 1fr; } }
+  #resultado { min-height: 360px; border-radius: 14px; display: flex; align-items: center; justify-content: center; text-align: center; padding: 20px;
+    background: #fff; border: 1px solid var(--borda); transition: background .15s; }
+  #resultado.liberado { background: var(--ok); color: #fff; border-color: var(--ok); }
+  #resultado.negado { background: var(--nao); color: #fff; border-color: var(--nao); }
+  #resultado .status { font-size: 52px; font-weight: 800; letter-spacing: 2px; }
+  #resultado .nome { font-size: 26px; font-weight: 700; margin-top: 6px; }
+  #resultado .det { font-size: 18px; opacity: .95; margin-top: 4px; }
+  #resultado .motivo { font-size: 24px; font-weight: 700; margin-top: 10px; }
+  #resultado .aviso { display: inline-block; background: #fff4e0; color: #7a4600; border-radius: 8px; padding: 6px 10px; margin-top: 10px; font-weight: 600; font-size: 17px; }
+  #resultado img.foto { width: 190px; height: 190px; object-fit: cover; border-radius: 12px; border: 4px solid rgba(255,255,255,.85); background: #dde3ea; }
+  #resultado .sem-foto { width: 190px; height: 190px; border-radius: 12px; background: rgba(255,255,255,.25); display: inline-flex; align-items: center; justify-content: center; font-size: 15px; }
+  .espera { color: var(--mut); font-size: 20px; }
+  #leitor { width: 100%; border-radius: 10px; overflow: hidden; }
+  #lista li { list-style: none; padding: 8px; border-bottom: 1px solid var(--borda); display: flex; gap: 8px; align-items: center; cursor: pointer; }
+  #lista li:hover { background: #f0f5fb; } #lista { padding: 0; margin: 8px 0 0; max-height: 320px; overflow: auto; }
+  .hist div { padding: 4px 0; border-bottom: 1px dashed var(--borda); font-size: 14px; }
+</style>
+</head>
+<body>
+<main>
+  <div class="barra">
+    <h1 id="titulo">Acesso</h1>
+    <button id="btCamera">📷 Usar câmera</button>
+    <button id="btTela">⛶ Tela cheia</button>
+  </div>
+  <form id="fLeitura" class="card" autocomplete="off" style="padding:12px">
+    <input id="codigo" placeholder="Aproxime a carteirinha do leitor (ou digite matrícula/CPF e Enter)" autofocus>
+  </form>
+  <div class="painel">
+    <div id="resultado"><div class="espera">Aguardando leitura…</div></div>
+    <div>
+      <div class="card" id="cxCamera" hidden><div id="leitor"></div></div>
+      <div class="card">
+        <h2>Sem carteirinha? Buscar por nome</h2>
+        <input id="busca" placeholder="Nome, matrícula ou CPF">
+        <ul id="lista"></ul>
+      </div>
+      <div class="card hist"><h2>Últimas leituras</h2><div id="hist" class="mut">—</div></div>
+    </div>
+  </div>
+</main>
+<script src="/app.js"></script>
+<script src="/vendor/html5-qrcode.min.js"></script>
+<script>
+const params = new URLSearchParams(location.search);
+const codPonto = params.get('ponto') || 'portaria';
+let cfg = {}, timerLimpa = null, ultimoCodigo = '', ultimoInstante = 0, ocupado = false;
+const historico = [];
+
+// Sons (sem arquivos): agudo = liberado, grave duplo = negado
+let audio;
+function bip(ok) {
+  try {
+    audio = audio || new AudioContext();
+    const tons = ok ? [[1200, 0, .15]] : [[300, 0, .25], [300, .32, .25]];
+    for (const [f, ini, dur] of tons) {
+      const o = audio.createOscillator(), g = audio.createGain();
+      o.frequency.value = f; o.type = 'square'; g.gain.value = .08;
+      o.connect(g).connect(audio.destination); o.start(audio.currentTime + ini); o.stop(audio.currentTime + ini + dur);
+    }
+  } catch {}
+}
+
+function mostrar(r) {
+  const el = document.getElementById('resultado');
+  el.className = r.liberado ? 'liberado' : 'negado';
+  const s = r.socio;
+  el.innerHTML = `<div>
+    ${s ? (s.foto ? `<img class="foto" src="${App.esc(s.foto)}" alt="">` : '<div class="sem-foto">sem foto</div>') : ''}
+    <div class="status">${r.liberado ? 'LIBERADO' : 'NEGADO'}</div>
+    ${s ? `<div class="nome">${App.esc(s.nome)}</div>
+      <div class="det">Matrícula ${App.esc(s.matricula)} · ${s.tipo === 'dependente' ? `Dependente${s.parentesco ? ' (' + App.esc(s.parentesco) + ')' : ''} de ${App.esc(s.titular_nome || '')}` : 'Titular'}${s.idade !== null ? ` · ${s.idade} anos` : ''}</div>` : ''}
+    ${r.motivo ? `<div class="motivo">${App.esc(r.motivo)}</div>` : ''}
+    ${(r.avisos || []).map((a) => `<div><span class="aviso">⚠ ${App.esc(a)}</span></div>`).join('')}
+  </div>`;
+  bip(r.liberado);
+  historico.unshift(`${new Date().toTimeString().slice(0, 5)} · <span class="tag ${r.liberado ? 'liberado' : 'negado'}">${r.liberado ? 'OK' : 'NEG'}</span> ${App.esc(s ? s.nome : 'não encontrado')}`);
+  historico.length = Math.min(historico.length, 8);
+  document.getElementById('hist').innerHTML = historico.map((h) => `<div>${h}</div>`).join('');
+  clearTimeout(timerLimpa);
+  timerLimpa = setTimeout(() => { el.className = ''; el.innerHTML = '<div class="espera">Aguardando leitura…</div>'; }, Number(cfg.tempo_resultado_seg || 4) * 1000);
+}
+function mostrarErro(msg) {
+  const el = document.getElementById('resultado');
+  el.className = 'negado'; el.innerHTML = `<div><div class="status">ERRO</div><div class="motivo">${App.esc(msg)}</div></div>`; bip(false);
+}
+
+async function verificar(codigo) {
+  codigo = String(codigo || '').trim();
+  if (!codigo || ocupado) return;
+  // evita leitura dupla do mesmo cartão (câmera lê várias vezes por segundo)
+  if (codigo === ultimoCodigo && Date.now() - ultimoInstante < 3000) return;
+  ultimoCodigo = codigo; ultimoInstante = Date.now(); ocupado = true;
+  try { mostrar(await App.api('/api/acesso/verificar', { method: 'POST', body: { codigo, ponto: codPonto } })); }
+  catch (e) { mostrarErro(e.message); }
+  finally { ocupado = false; }
+}
+
+document.getElementById('fLeitura').onsubmit = (e) => { e.preventDefault(); const c = document.getElementById('codigo'); verificar(c.value); c.value = ''; };
+
+// Mantém o foco no campo de leitura (leitor USB funciona como teclado)
+const campo = document.getElementById('codigo');
+document.addEventListener('click', (e) => { if (!e.target.closest('input, button, #lista, #cxCamera')) campo.focus(); });
+campo.addEventListener('blur', () => setTimeout(() => { if (!document.activeElement || document.activeElement === document.body) campo.focus(); }, 150));
+
+// Busca por nome
+let tBusca;
+document.getElementById('busca').oninput = (e) => {
+  clearTimeout(tBusca);
+  const q = e.target.value.trim();
+  if (q.length < 3) { lista.innerHTML = ''; return; }
+  tBusca = setTimeout(async () => {
+    const r = await App.api('/api/socios?limite=30&q=' + encodeURIComponent(q));
+    lista.innerHTML = r.map((s) => `<li data-id="${s.id}">${App.fotoHTML(s.foto)}<div><b>${App.esc(s.nome)}</b><br>
+      <span class="mut">${App.esc(s.matricula)} · ${s.tipo}</span> <span class="tag ${s.situacao}">${s.situacao}</span></div></li>`).join('')
+      || '<li class="mut">Nenhum sócio encontrado.</li>';
+  }, 250);
+};
+document.getElementById('lista').onclick = async (e) => {
+  const li = e.target.closest('li[data-id]'); if (!li) return;
+  try { mostrar(await App.api(`/api/acesso/socio/${li.dataset.id}`, { method: 'POST', body: { ponto: codPonto } })); }
+  catch (err) { mostrarErro(err.message); }
+  document.getElementById('busca').value = ''; lista.innerHTML = ''; campo.focus();
+};
+
+// Câmera (tablet/celular) — requer HTTPS ou localhost
+let leitor = null;
+document.getElementById('btCamera').onclick = async () => {
+  const cx = document.getElementById('cxCamera'), bt = document.getElementById('btCamera');
+  if (leitor) { await leitor.stop().catch(() => {}); leitor = null; cx.hidden = true; bt.textContent = '📷 Usar câmera'; return; }
+  if (!window.isSecureContext) { mostrarErro('A câmera só funciona via HTTPS. Use o leitor USB ou veja docs/INSTALACAO.md.'); return; }
+  cx.hidden = false; bt.textContent = '✕ Desligar câmera';
+  leitor = new Html5Qrcode('leitor', { formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE] });
+  try { await leitor.start({ facingMode: 'environment' }, { fps: 10, qrbox: 240 }, (txt) => verificar(txt)); }
+  catch (e) { mostrarErro('Não foi possível abrir a câmera: ' + e); leitor = null; cx.hidden = true; bt.textContent = '📷 Usar câmera'; }
+};
+document.getElementById('btTela').onclick = () => document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen();
+
+App.iniciar().then(async () => {
+  cfg = await App.api('/api/config');
+  const pontos = await App.api('/api/pontos');
+  const p = pontos.find((x) => x.codigo === codPonto);
+  document.getElementById('titulo').textContent = p ? p.nome + (p.exige_exame ? ' (exige exame médico)' : '') : 'Ponto inválido';
+  document.title = (p ? p.nome : 'Acesso') + ' · Controle de Acesso';
+  // marca o item do menu correspondente
+  document.querySelectorAll('header nav a').forEach((a) => { if (a.getAttribute('href') === `/acesso?ponto=${codPonto}`) a.classList.add('ativo'); });
+  campo.focus();
+});
+</script>
+</body>
+</html>
