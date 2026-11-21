@@ -45,10 +45,19 @@ Telas:
 
 ## Documentação
 
+- [docs/Manual_Usuario_Controle_Acesso.pdf](docs/Manual_Usuario_Controle_Acesso.pdf) — **manual do usuário** completo (infraestrutura, instalação e uso), também em [Word](docs/Manual_Usuario_Controle_Acesso.docx)
 - [docs/INFRAESTRUTURA.md](docs/INFRAESTRUTURA.md) — **lista de equipamentos e custos estimados**
 - [docs/Lista_Infraestrutura_Clube.xlsx](docs/Lista_Infraestrutura_Clube.xlsx) — mesma lista em planilha, com totais por cenário
 - [docs/INSTALACAO.md](docs/INSTALACAO.md) — instalação, rede, HTTPS para câmera, backup, implantação
 - [docs/esp32-acionamento](docs/esp32-acionamento) — firmware para acionar catraca/fechadura
+
+## Esqueceu a senha do admin?
+
+No servidor, dentro da pasta do sistema:
+
+```bash
+npm run reset-senha -- admin NovaSenha123
+```
 
 ## Testes
 

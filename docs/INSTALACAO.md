@@ -50,6 +50,7 @@ Reinicie o sistema e acesse `https://IP:3443`. Na primeira vez, o Chrome mostra 
 | Secretaria | Lançar validade do exame médico | A cada exame apresentado |
 | Admin | Conferir **Relatórios → Pendências** | Semanal |
 | Admin | **Configurações → Baixar backup** + copiar pasta `data/fotos` | Semanal (pendrive em rodízio) |
+| Admin | Esqueceu a senha do admin → no servidor: `npm run reset-senha -- admin NovaSenha123` | Sob demanda |
 | Admin | Carteirinha perdida → **Reemitir** (o QR antigo para de funcionar na hora) | Sob demanda |
 
 ## 6. Catraca/fechadura (opcional)
